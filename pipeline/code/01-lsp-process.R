@@ -9,17 +9,13 @@
 #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# Submitted to the job for each site with shell script:
-# #!/bin/bash
-# echo Submitting $1
-# R --vanilla < ~/01_img_process.R $1
+# Submitted to the job for each site with terminal line:
+# R --vanilla < pipeline/code/01-lsp-process.R 
 #
-# example submission command using default parameters:
-# qsub -V -pe omp 28 -l h_rt=12:00:00 run_01.sh numSite
 #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 01-image-process.R  —  Efficient, CyVerse-friendly refactor
+# 01-lsp-process.R  —  Efficient, CyVerse-friendly refactor
 #=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 required_packages <- c(
@@ -43,12 +39,15 @@ library(doParallel)
 #---------------------------------------------
 # Command-line argument
 args <- commandArgs(trailingOnly = TRUE)
-numSite <- as.numeric(args[1])
+numSite <- if (length(args) >= 1) as.numeric(args[1]) else 1
+if (is.na(numSite)) {
+  stop("numSite must be a number (got: ", paste(args, collapse = " "), ")")
+}
 message("📍 Running site index: ", numSite)
 
 #---------------------------------------------
 # Load parameters and functions
-params <- fromJSON(file = "pipeline/wetlsp-parameters.json")
+params <- fromJSON(file = "pipeline/lsp-parameters.json")
 source(params$setup$rFunctions)
 
 #---------------------------------------------
