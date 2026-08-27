@@ -1,17 +1,17 @@
 {
   "setup":{
     
-    "phenStartYr":2021,
-    "phenEndYr":2025,
+    "phenStartYr":2016,
+    "phenEndYr":2026,
     
-    "workDir":"/Users/gawainmacneacail/Documents/Research/Work/PlanetScope/WetLSP",
+    "workDir":"/Users/gawainmacneacail/Documents/Research/Work/Nachusa Grasslands/PlanetScope/NachusaLSP",
     "logDir":"runLogs",
-    "geojsonDir": "/Users/gawainmacneacail/Documents/Research/Work/PlanetScope/WetLSP/geojson",
-    "dataDir":"/Users/gawainmacneacail/Documents/Research/Work/PlanetScope/WetLSP/rawImage",
+    "geojsonDir": "/Users/gawainmacneacail/Documents/Research/Work/Nachusa Grasslands/PlanetScope/NachusaLSP/geojson",
+    "dataDir":"/Users/gawainmacneacail/Documents/Research/Work/Nachusa Grasslands/PlanetScope/NachusaLSP/rawImage",
     "outDir":"output",
     "rScripts":"pipeline/code",
-    "rFunctions":"pipeline/wetlsp-functions.R",
-    "productTable":"metadata/wetlsp-layers.csv",
+    "rFunctions":"pipeline/lsp-functions.R",
+    "productTable":"metadata/lsp-layers.csv",
     
     "water":"water/",
     

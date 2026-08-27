@@ -845,78 +845,59 @@ DoPhenologyPlanet <- function(blue, green, red, nir, dates, phenYrs, params, wat
 
 #---------------------------------------------------------------------
 # Get site name, image directory and coordinate
-# Minkyu Moon 
+# Minkyu Moon / adapted for WetLSP single-site layout
 #---------------------------------------------------------------------
 GetSiteInfo <- function(numSite, geojsonDir, params){
   
-  neon  <- params$setup$neon
-  amflx <- params$setup$amflx
+  gjList <- list.files(path = geojsonDir, pattern = glob2rx('*.geojson'))
+  gjListFull <- list.files(path = geojsonDir, pattern = glob2rx('*.geojson'),
+                           full.names = TRUE)
   
-  if(neon){
-    gjList <- list.files(path=paste0(geojsonDir,'/NEON'),pattern=glob2rx('*.geojson'))
-    gjListFull <- list.files(path=paste0(geojsonDir,'/NEON'),pattern=glob2rx('*.geojson'),full.names=T)
-    
-    cat("🔎 numSite = ", numSite, "\n")
-    cat("📁 geojsonDir = ", geojsonDir, "\n")
-    
-    gjListFull <- list.files(path=geojsonDir, pattern=glob2rx('*.geojson'), full.names=TRUE)
-    
-    cat("📝 Found ", length(gjListFull), " geojson files\n")
-    print(gjListFull)
-    
-    if (is.na(numSite) || numSite > length(gjListFull)) {
-      stop("❌ numSite index is invalid: ", numSite, " (only ", length(gjListFull), " files found)")
-    }
-    cat("📄 Loading file: ", gjListFull[numSite], "\n")
-    
-    gparams <- FROM_GeoJson(gjListFull[numSite])
-    
-    strSite <- paste(strsplit(strsplit(gjList[numSite],'[.]')[[1]][1],' ')[[1]],collapse='_')
-    try(strSite <- gsub("&", "and", strSite))
-    try(strSite <- gsub("'", "_", strSite))
-    if(numSite==45) strSite <- 'Utqiag__vik_NEON'
-    imgDir <- dir(path=paste0(params$setup$dataDir,'neon'),pattern=glob2rx(paste0('*',strSite,'*')),full.names=T)
-  }else if(amflx){
-    gjList <- list.files(path=paste0(geojsonDir,'/AMFLX'),pattern=glob2rx('*.geojson'))
-    gjListFull <- list.files(path=paste0(geojsonDir,'/AMFLX'),pattern=glob2rx('*.geojson'),full.names=T)
-    
-    gparams <- FROM_GeoJson(gjListFull[numSite])
-    
-    strSite <- paste(strsplit(strsplit(gjList[numSite],'[.]')[[1]][1],' ')[[1]],collapse='_')
-    try(strSite <- gsub("[(]", "_", strSite))
-    try(strSite <- gsub("[)]", "_", strSite))
-    try(strSite <- gsub("#", "_", strSite))
-    try(strSite <- gsub(",", "_", strSite))
-    
-    imgDir <- dir(path=paste0(params$setup$dataDir),pattern=glob2rx(paste0('*',strSite,'*')),full.names=T)
-  }else{
-    gjList <- list.files(path=paste0(geojsonDir),pattern=glob2rx('*.geojson'))
-    gjListFull <- list.files(path=paste0(geojsonDir),pattern=glob2rx('*.geojson'),full.names=T)
-    
-    gparams <- FROM_GeoJson(gjListFull[numSite])
-    
-    strSite <- paste(strsplit(strsplit(gjList[numSite],'[.]')[[1]][1],' ')[[1]],collapse='_')
-    # if(numSite==92) strSite <- 'Univ._of_Mich'
-    try(strSite <- gsub("&", "and", strSite))
-    try(strSite <- gsub("'", "_", strSite))
-    try(strSite <- gsub("[(]", "_", strSite))
-    try(strSite <- gsub("[)]", "_", strSite))
-    try(strSite <- gsub("#", "_", strSite))
-    try(strSite <- gsub(",", "_", strSite))
-    
-    imgDir <- dir(path=params$setup$dataDir,pattern=glob2rx(paste0('*',strSite,'*')),full.names=T)
-    
-    # if(numSite==33) imgDir <- imgDir[1]
+  cat("🔎 numSite = ", numSite, "\n")
+  cat("📁 geojsonDir = ", geojsonDir, "\n")
+  cat("📝 Found ", length(gjListFull), " geojson files\n")
+  print(gjListFull)
+  
+  if (length(gjListFull) == 0) {
+    stop("❌ No .geojson files found in: ", geojsonDir)
+  }
+  if (is.na(numSite) || numSite < 1 || numSite > length(gjListFull)) {
+    stop("❌ numSite index is invalid: ", numSite,
+         " (only ", length(gjListFull), " files found)")
   }
   
-  temp <- unlist(strsplit(imgDir,'/'))
+  cat("📄 Loading file: ", gjListFull[numSite], "\n")
+  gparams <- FROM_GeoJson(gjListFull[numSite])
+  
+  # Site name from geojson filename (drop extension, spaces -> underscores)
+  strSite <- paste(strsplit(strsplit(gjList[numSite], '[.]')[[1]][1], ' ')[[1]],
+                   collapse = '_')
+  try(strSite <- gsub("&", "and", strSite))
+  try(strSite <- gsub("'", "_", strSite))
+  try(strSite <- gsub("[(]", "_", strSite))
+  try(strSite <- gsub("[)]", "_", strSite))
+  try(strSite <- gsub("#", "_", strSite))
+  try(strSite <- gsub(",", "_", strSite))
+  
+  imgDir <- dir(path = params$setup$dataDir,
+                pattern = glob2rx(paste0('*', strSite, '*')),
+                full.names = TRUE)
+  
+  if (length(imgDir) == 0) {
+    stop("❌ No image directory matching '*", strSite, "*' under ",
+         params$setup$dataDir)
+  }
+  
+  # Prefer the directory folder name as the canonical site string
+  temp <- unlist(strsplit(imgDir[1], '/'))
   strSite <- temp[length(temp)]
   
-  # Longitude and Latitude
-  cLong <- (min(gparams$features[[1]]$geometry$coordinates[,1])+max(gparams$features[[1]]$geometry$coordinates[,1]))/2
-  cLat  <- (min(gparams$features[[1]]$geometry$coordinates[,2])+max(gparams$features[[1]]$geometry$coordinates[,2]))/2
+  # Longitude and Latitude (centroid of first feature)
+  coords <- gparams$features[[1]]$geometry$coordinates
+  cLong <- (min(coords[, 1]) + max(coords[, 1])) / 2
+  cLat  <- (min(coords[, 2]) + max(coords[, 2])) / 2
   
-  return(list(imgDir=imgDir,strSite=strSite,cLong=cLong,cLat=cLat))
+  return(list(imgDir = imgDir, strSite = strSite, cLong = cLong, cLat = cLat))
 }
 
 

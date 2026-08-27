@@ -1,13 +1,13 @@
-# WetLSP v2
+# nachusaLSP
 
-**Fork:** Updated algorithms (July 2025) to derived a land surface phenology product from PlanetScope imagery for FLUXNET-CH4 v2 sites. Data developed and initially shared for wetland methane research applications in the McNicol ecophilab, the ESIIL AI for Natural Methane Working Group, and the USGS Powell Synthesis for Wetlands.
+**Fork:** Updated algorithms (July 2025) to derived a land surface phenology product from PlanetScope imagery for Nachusa Grasslands. Data developed and initially shared for wetland methane research applications in the McNicol ecophilab, the ESIIL AI for Natural Methane Working Group, and the USGS Powell Synthesis for Wetlands.
 
 Presently, the pipeline generate daily pixel-wise EVI after PS processing, filtering and gap-filling using smooth spline. These procedures could be revised and improved.
 
 To run updated code:  
 
 - Clone the repo into your workspace
-- Create directories listed at top of PLSP_Parameters_gm_v1.json and updated filepaths 
+- Create directories listed at top of `file = "pipeline/lsp-parameters.json"` and updated filepaths 
 - Use `00_img_download.py` to retrieve data via PlanetScope API into created `rawImage` dir
 - Run series of 5 processing scripts
 - Ignore `pipeline/validation` and `pipeline/timeseries` for downstream analysis/time series retention
@@ -20,7 +20,6 @@ To run updated code:
   * `review-fetch-rds.Rmd` to inspect the fetch perimeter and visualize/explore .RDS object
  
 Quirks:
-* Note that original geojson files must be stored within `/AMFLX` subdirectory 
 * `_gm_v1` workflow skips water mask steps in `03_LSP_script`, should not break process, but use if available
 
 
