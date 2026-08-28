@@ -109,12 +109,12 @@ for (site_example in site_examples) {
 ## Check netcdf
 
 ```{r output}
-site_to_check <- site_examples[2]
+site_to_check <- site_examples[1]
 year_to_check <- 2023
 
 define_patch_path <- file.path(
   "..", "output", site_to_check, "netcdf",
-  paste0(site_to_check, "-wetlsp-", year_to_check, ".nc")
+  paste0(site_to_check, "-lsp-", year_to_check, ".nc")
 )
 
 nc <- nc_open(define_patch_path)
