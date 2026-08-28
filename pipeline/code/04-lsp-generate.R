@@ -24,7 +24,7 @@ if (is.na(numSite)) stop("❌ Provide numSite as first argument")
 message("📍 Running site index: ", numSite)
 
 # Prefer the unified parameters file; fall back to legacy if needed
-params_path <- "pipeline/wetlsp-parameters.json"
+params_path <- "pipeline/lsp-parameters.json"
 if (!file.exists(params_path)) params_path <- "PLSP_Parameters_gm_v1.json"
 params <- fromJSON(file = params_path)
 source(params$setup$rFunctions)

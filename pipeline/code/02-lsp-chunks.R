@@ -22,13 +22,15 @@ library(doParallel)
 #---------------------------------------------
 # Command-line argument
 args <- commandArgs(trailingOnly = TRUE)
-numSite <- as.numeric(args[1])
-if (is.na(numSite)) stop("❌ Provide numSite as first argument")
+numSite <- if (length(args) >= 1) as.numeric(args[1]) else 1
+if (is.na(numSite)) {
+  stop("numSite must be a number (got: ", paste(args, collapse = " "), ")")
+}
 message("📍 Running site index: ", numSite)
 
 #---------------------------------------------
 # Load parameters and helper functions
-params <- fromJSON(file = "pipeline/wetlsp-parameters.json")
+params <- fromJSON(file = "pipeline/lsp-parameters.json")
 source(params$setup$rFunctions)
 
 #---------------------------------------------
@@ -102,7 +104,7 @@ if (dir.exists(ckDir) && !overwrite_chunks) {
   if (length(existing_chunks) >= numCk) {
     message("✅ All ", numCk, " chunk files already exist in: ", ckDir)
     message("   Skipping chunk creation for site ", strSite,
-            " (set 'overwriteChunks': true in wetlsp-parameters.json to force rebuild).")
+            " (set 'overwriteChunks': true in lsp-parameters.json to force rebuild).")
     quit(save = "no", status = 0)
   } else {
     message("ℹ️  Chunk dir exists but only ", length(existing_chunks),

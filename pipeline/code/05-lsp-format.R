@@ -22,7 +22,7 @@ numSite <- as.numeric(args[1])
 if (is.na(numSite)) stop("❌ Provide numSite as first argument")
 message("📍 Running site index: ", numSite)
 
-params_path <- "pipeline/wetlsp-parameters.json"
+params_path <- "pipeline/lsp-parameters.json"
 if (!file.exists(params_path)) params_path <- "PLSP_Parameters_gm_v1.json"
 params <- fromJSON(file = params_path)
 source(params$setup$rFunctions)
@@ -81,7 +81,7 @@ for (yy in phenYrs) {
   tif_files <- list.files(yearDir, pattern="\\.tif$", full.names=TRUE)
   if (!length(tif_files)) { message("⚠️  No TIFFs for ", yy); next }
 
-  outFile <- file.path(outBase, paste0("WetLSP_", yy, ".nc"))
+  outFile <- file.path(outBase, paste0("lsp_", yy, ".nc"))
   if (file.exists(outFile)) { message("⏭️  NetCDF already exists for ", yy); next }
 
   message("💾 Creating NetCDF for ", strSite, " — ", yy)
@@ -155,17 +155,17 @@ for (yy in phenYrs) {
             paste(xminv, resxy[1], 0, ymaxv, 0, -resxy[2]))
 
   # ------------------------- Global attributes ---------------------------------
-  ncatt_put(ncout, 0, "title",               "Wetland Surface Phenology from PlanetScope (WetLSP)")
-  ncatt_put(ncout, 0, "summary",             "High-resolution Land-Surface Phenology for FLUXNET-CH4 wetlands")
+  ncatt_put(ncout, 0, "title",               "Land Surface Phenology from PlanetScope (lsp)")
+  ncatt_put(ncout, 0, "summary",             "High-resolution Land-Surface Phenology for Nachusa")
   ncatt_put(ncout, 0, "product_version",     "v001")
-  ncatt_put(ncout, 0, "software_repository", "https://github.com/McNicol-Lab/WetLSP")
+  ncatt_put(ncout, 0, "software_repository", "https://github.com/McNicol-Lab/nachusaLSP")
 
   ncatt_put(ncout, 0, "origin_creator_name", "Land Cover & Surface Climate Group, Boston University")
   ncatt_put(ncout, 0, "fork_creator_name",   "Ecosystem and Planetary Health Integration Lab, UIC")
   ncatt_put(ncout, 0, "origin_contributor_name",
             "Minkyu Moon, A.R. Richardson, T. Milliman, M.A. Friedl")
   ncatt_put(ncout, 0, "fork_contributor_name",
-            "Gavin McNicol, Aarin Bothra, Youmi Oh, Lichen Liu, Sparkle Malone, Qing Zhu")
+            "Gavin McNicol")
 
   ncatt_put(ncout, "x", "axis", "projection_x_coordinate")
   ncatt_put(ncout, "y", "axis", "projection_y_coordinate")

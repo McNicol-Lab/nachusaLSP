@@ -31,7 +31,7 @@ numSite <- as.numeric(args[1])
 if (is.na(numSite)) stop("❌ Provide numSite as first argument")
 message("📍 Running site index: ", numSite)
 
-params <- fromJSON(file = "pipeline/wetlsp-parameters.json")
+params <- fromJSON(file = "pipeline/lsp-parameters.json")
 source(params$setup$rFunctions)
 
 # ------------------------------- Site Lookup -----------------------------------

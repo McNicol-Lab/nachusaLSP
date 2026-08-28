@@ -139,24 +139,24 @@ message("🌐 terra tempdir: ", terraOptions()$tempdir)
 message("🌐 terra threads: ", terraOptions()$threads)
 
 
-#---------------------------------------------
-# Parallel backend setup (safe version)
-num_cores <- min(8, parallel::detectCores() - 1)   # safer upper bound; adjust if you have more RAM
-message("🔁 Setting up parallel backend with ", num_cores, " workers")
-
-if (.Platform$OS.type == "unix") {
-  # On CyVerse (Linux): shared-memory backend avoids serialization errors
-  if (!requireNamespace("doMC", quietly = TRUE)) install.packages("doMC", repos = "https://cran.rstudio.com/")
-  library(doMC)
-  registerDoMC(cores = num_cores)
-  message("✅ Using doMC (shared-memory) backend")
-} else {
-  # Fallback for Windows or non-Unix environments
-  cl <- parallel::makeCluster(num_cores, timeout = 3600)
-  doParallel::registerDoParallel(cl)
-  message("✅ Using PSOCK cluster backend")
-}
-
+# #---------------------------------------------
+# # Parallel backend setup (safe version)
+# num_cores <- min(8, parallel::detectCores() - 1)   # safer upper bound; adjust if you have more RAM
+# message("🔁 Setting up parallel backend with ", num_cores, " workers")
+# 
+# if (.Platform$OS.type == "unix") {
+#   # On CyVerse (Linux): shared-memory backend avoids serialization errors
+#   if (!requireNamespace("doMC", quietly = TRUE)) install.packages("doMC", repos = "https://cran.rstudio.com/")
+#   library(doMC)
+#   registerDoMC(cores = num_cores)
+#   message("✅ Using doMC (shared-memory) backend")
+# } else {
+#   # Fallback for Windows or non-Unix environments
+#   cl <- parallel::makeCluster(num_cores, timeout = 3600)
+#   doParallel::registerDoParallel(cl)
+#   message("✅ Using PSOCK cluster backend")
+# }
+# 
 
 #---------------------------------------------
 # Output directory for mosaics
@@ -182,181 +182,290 @@ if (length(dates_to_process) == 0) {
 message("🧭 Found ", length(existing_files), " existing mosaics. ",
         "Processing remaining ", length(dates_to_process), " dates.")
 
+# #---------------------------------------------
+# # Parallel loop across dates
+# foreach(
+#   dd = seq_along(dates_to_process),
+#   .packages = c("terra", "raster"),
+#   .export   = c("file_table", "dfileUDM2", "fileUDM2", "siteWin", "outDirMosaic", "dates_to_process")
+# ) %dopar% {
+#   
+#   # Wrap ENTIRE per-date body so one failure doesn't kill the job
+#   result <- tryCatch({
+#     
+#     current_date <- dates_to_process[dd]
+#     
+#     # extra safety: if the Date class has been dropped, restore it
+#     if (!inherits(current_date, "Date")) {
+#       current_date <- as.Date(current_date, origin = "1970-01-01")
+#     }
+#     
+#     message("🔥 [PID ", Sys.getpid(), "] Processing date ", current_date)
+#     
+#     files_today <- file_table[file_table$date == current_date, ]
+#     imgValid <- integer(0)
+#     
+#     # --- Quick raster validity check (SR images only) ---
+#     for (mm in seq_len(nrow(files_today))) {
+#       r <- try({
+#         img <- terra::rast(files_today$full_path[mm])
+#         img <- terra::crop(img, siteWin)  # may fail if extents don't overlap
+#         img
+#       }, silent = TRUE)
+#       
+#       if (!inherits(r, "try-error") && nlyr(r) >= 4) {
+#         imgValid <- c(imgValid, mm)
+#       }
+#     }
+#     
+#     if (length(imgValid) == 0) {
+#       message("⛔ No valid images for ", current_date)
+#       return(NULL)
+#     }
+#     
+#     # --- Helper: simple extent-overlap test (no terra::relate) ---
+#     has_overlap <- function(a, b) {
+#       ea <- terra::ext(a); eb <- terra::ext(b)
+#       !(ea$xmax <= eb$xmin ||
+#           ea$xmin >= eb$xmax ||
+#           ea$ymax <= eb$ymin ||
+#           ea$ymin >= eb$ymax)
+#     }
+#     
+#     # --- Process valid rasters in-memory ---
+#     imgB <- vector("list", length(imgValid))
+#     
+#     for (nn in seq_along(imgValid)) {
+#       idx <- imgValid[nn]
+#       base_file <- files_today$file_name[idx]
+#       full_file <- files_today$full_path[idx]
+#       date_str  <- regmatches(base_file, regexpr("\\d{8}", base_file))
+#       
+#       message("🧩 Reading ", base_file)
+#       
+#       imgT <- try(terra::rast(full_file), silent = TRUE)
+#       if (inherits(imgT, "try-error")) {
+#         message("⚠️  Failed to read image for ", base_file, " – skipping.")
+#         next
+#       }
+#       
+#       # Crop to site window (already CRS-aligned at template stage)
+#       imgT <- try(terra::crop(imgT, siteWin), silent = TRUE)
+#       if (inherits(imgT, "try-error")) {
+#         message("⚠️  Crop to siteWin failed for ", base_file, " – skipping.")
+#         next
+#       }
+#       
+#       # --- Optional UDM2 masking (defensive) ---
+#       udm2_match <- grep(date_str, dfileUDM2)
+#       if (length(udm2_match) > 0) {
+#         message("☁️  Applying UDM2 mask")
+#         
+#         udm2T <- try(terra::rast(fileUDM2[udm2_match[1]]), silent = TRUE)
+#         if (!inherits(udm2T, "try-error")) {
+#           
+#           # Ensure CRS compatibility
+#           if (!isTRUE(terra::compareGeom(imgT, udm2T, crs = TRUE,
+#                                          ext = FALSE, rowcol = FALSE,
+#                                          stopOnError = FALSE))) {
+#             message("⚙️  Reprojecting UDM2 to match image CRS/grid for ", base_file)
+#             udm2T <- try(terra::project(udm2T, imgT), silent = TRUE)
+#             if (inherits(udm2T, "try-error")) {
+#               message("⚠️  UDM2 reprojection failed for ", base_file, " – skipping mask.")
+#               udm2T <- NULL
+#             }
+#           }
+#           
+#           if (!is.null(udm2T)) {
+#             # Check overlap BEFORE any crop/mask
+#             if (!has_overlap(udm2T, imgT)) {
+#               message("⚠️  UDM2 extent does not overlap image for ", base_file,
+#                       " – skipping mask.")
+#             } else {
+#               # Align extents roughly to imgT
+#               udm2T <- try(terra::crop(udm2T, imgT, snap = "out"), silent = TRUE)
+#               if (!inherits(udm2T, "try-error")) {
+#                 mask_clear <- udm2T[[1]] == 1
+#                 imgT_masked <- try(terra::mask(imgT, mask_clear, maskvalue = 0),
+#                                    silent = TRUE)
+#                 if (!inherits(imgT_masked, "try-error")) {
+#                   imgT <- imgT_masked
+#                 } else {
+#                   message("⚠️  Masking failed for ", base_file, " – keeping unmasked image.")
+#                 }
+#               } else {
+#                 message("⚠️  UDM2 crop failed for ", base_file, " – skipping mask.")
+#               }
+#             }
+#           }
+#         } else {
+#           message("⚠️  Failed to read UDM2 for ", base_file, " – skipping mask.")
+#         }
+#       } else {
+#         message("⚠️  No UDM2 match for ", date_str)
+#       }
+#       
+#       imgB[[nn]] <- imgT
+#     }
+#     
+#     # --- Mosaic in-memory (safe version) ---
+#     valid_nonempty <- vapply(
+#       imgB,
+#       function(x) inherits(x, "SpatRaster") && nlyr(x) > 0,
+#       logical(1)
+#     )
+#     imgB <- imgB[valid_nonempty]
+#     
+#     if (length(imgB) == 0) {
+#       message("⛔ No usable rasters for ", current_date, " after masking.")
+#       return(NULL)
+#     }
+#     
+#     if (length(imgB) == 1) {
+#       Rast <- imgB[[1]]
+#       message("ℹ️  Only one valid raster for ", current_date, " — skipping mosaic.")
+#     } else {
+#       template <- imgB[[1]]
+#       imgB_aligned <- lapply(imgB, function(r) {
+#         if (!isTRUE(terra::compareGeom(r, template, stopOnError = FALSE))) {
+#           terra::project(r, template)
+#         } else {
+#           r
+#         }
+#       })
+#       
+#       Rast <- try(do.call(terra::mosaic, imgB_aligned), silent = TRUE)
+#       if (inherits(Rast, "try-error")) {
+#         message("⚠️  Mosaic failed for ", current_date, ", returning first raster instead.")
+#         Rast <- template
+#       }
+#     }
+#     
+#     # --- Write mosaic or single raster ---
+#     date_str <- strftime(current_date, "%Y%m%d")
+#     outFile <- file.path(outDirMosaic, paste0(date_str, "_clipped_mosaic.tif"))
+#     terra::writeRaster(Rast, outFile, overwrite = TRUE, filetype = "GTiff")
+#     message("✅ Saved mosaic: ", outFile)
+#     
+#     return(outFile)
+#     
+#   }, error = function(e) {
+#     # This prevents foreach from bombing out and lets you see *which* date failed
+#     message("❌ ERROR on date ", dates_to_process[dd], " (index ", dd, "): ", conditionMessage(e))
+#     NULL
+#   })
+#   
+#   result
+# }
+
 #---------------------------------------------
-# Parallel loop across dates
-foreach(
-  dd = seq_along(dates_to_process),
-  .packages = c("terra", "raster"),
-  .export   = c("file_table", "dfileUDM2", "fileUDM2", "siteWin", "outDirMosaic", "dates_to_process")
-) %dopar% {
-  
-  # Wrap ENTIRE per-date body so one failure doesn't kill the job
-  result <- tryCatch({
-    
-    current_date <- dates_to_process[dd]
-    
-    # extra safety: if the Date class has been dropped, restore it
-    if (!inherits(current_date, "Date")) {
-      current_date <- as.Date(current_date, origin = "1970-01-01")
-    }
-    
-    message("🔥 [PID ", Sys.getpid(), "] Processing date ", current_date)
-    
-    files_today <- file_table[file_table$date == current_date, ]
-    imgValid <- integer(0)
-    
-    # --- Quick raster validity check (SR images only) ---
-    for (mm in seq_len(nrow(files_today))) {
-      r <- try({
-        img <- terra::rast(files_today$full_path[mm])
-        img <- terra::crop(img, siteWin)  # may fail if extents don't overlap
-        img
-      }, silent = TRUE)
-      
-      if (!inherits(r, "try-error") && nlyr(r) >= 4) {
-        imgValid <- c(imgValid, mm)
-      }
-    }
-    
-    if (length(imgValid) == 0) {
-      message("⛔ No valid images for ", current_date)
-      return(NULL)
-    }
-    
-    # --- Helper: simple extent-overlap test (no terra::relate) ---
-    has_overlap <- function(a, b) {
-      ea <- terra::ext(a); eb <- terra::ext(b)
-      !(ea$xmax <= eb$xmin ||
-          ea$xmin >= eb$xmax ||
-          ea$ymax <= eb$ymin ||
-          ea$ymin >= eb$ymax)
-    }
-    
-    # --- Process valid rasters in-memory ---
-    imgB <- vector("list", length(imgValid))
-    
-    for (nn in seq_along(imgValid)) {
-      idx <- imgValid[nn]
-      base_file <- files_today$file_name[idx]
-      full_file <- files_today$full_path[idx]
-      date_str  <- regmatches(base_file, regexpr("\\d{8}", base_file))
-      
-      message("🧩 Reading ", base_file)
-      
-      imgT <- try(terra::rast(full_file), silent = TRUE)
-      if (inherits(imgT, "try-error")) {
-        message("⚠️  Failed to read image for ", base_file, " – skipping.")
-        next
-      }
-      
-      # Crop to site window (already CRS-aligned at template stage)
-      imgT <- try(terra::crop(imgT, siteWin), silent = TRUE)
-      if (inherits(imgT, "try-error")) {
-        message("⚠️  Crop to siteWin failed for ", base_file, " – skipping.")
-        next
-      }
-      
-      # --- Optional UDM2 masking (defensive) ---
-      udm2_match <- grep(date_str, dfileUDM2)
-      if (length(udm2_match) > 0) {
-        message("☁️  Applying UDM2 mask")
-        
-        udm2T <- try(terra::rast(fileUDM2[udm2_match[1]]), silent = TRUE)
-        if (!inherits(udm2T, "try-error")) {
-          
-          # Ensure CRS compatibility
-          if (!isTRUE(terra::compareGeom(imgT, udm2T, crs = TRUE,
-                                         ext = FALSE, rowcol = FALSE,
-                                         stopOnError = FALSE))) {
-            message("⚙️  Reprojecting UDM2 to match image CRS/grid for ", base_file)
-            udm2T <- try(terra::project(udm2T, imgT), silent = TRUE)
-            if (inherits(udm2T, "try-error")) {
-              message("⚠️  UDM2 reprojection failed for ", base_file, " – skipping mask.")
-              udm2T <- NULL
-            }
-          }
-          
-          if (!is.null(udm2T)) {
-            # Check overlap BEFORE any crop/mask
-            if (!has_overlap(udm2T, imgT)) {
-              message("⚠️  UDM2 extent does not overlap image for ", base_file,
-                      " – skipping mask.")
-            } else {
-              # Align extents roughly to imgT
-              udm2T <- try(terra::crop(udm2T, imgT, snap = "out"), silent = TRUE)
-              if (!inherits(udm2T, "try-error")) {
-                mask_clear <- udm2T[[1]] == 1
-                imgT_masked <- try(terra::mask(imgT, mask_clear, maskvalue = 0),
-                                   silent = TRUE)
-                if (!inherits(imgT_masked, "try-error")) {
-                  imgT <- imgT_masked
-                } else {
-                  message("⚠️  Masking failed for ", base_file, " – keeping unmasked image.")
-                }
-              } else {
-                message("⚠️  UDM2 crop failed for ", base_file, " – skipping mask.")
-              }
-            }
-          }
-        } else {
-          message("⚠️  Failed to read UDM2 for ", base_file, " – skipping mask.")
-        }
-      } else {
-        message("⚠️  No UDM2 match for ", date_str)
-      }
-      
-      imgB[[nn]] <- imgT
-    }
-    
-    # --- Mosaic in-memory (safe version) ---
-    valid_nonempty <- vapply(
-      imgB,
-      function(x) inherits(x, "SpatRaster") && nlyr(x) > 0,
-      logical(1)
-    )
-    imgB <- imgB[valid_nonempty]
-    
-    if (length(imgB) == 0) {
-      message("⛔ No usable rasters for ", current_date, " after masking.")
-      return(NULL)
-    }
-    
-    if (length(imgB) == 1) {
-      Rast <- imgB[[1]]
-      message("ℹ️  Only one valid raster for ", current_date, " — skipping mosaic.")
-    } else {
-      template <- imgB[[1]]
-      imgB_aligned <- lapply(imgB, function(r) {
-        if (!isTRUE(terra::compareGeom(r, template, stopOnError = FALSE))) {
-          terra::project(r, template)
-        } else {
-          r
-        }
-      })
-      
-      Rast <- try(do.call(terra::mosaic, imgB_aligned), silent = TRUE)
-      if (inherits(Rast, "try-error")) {
-        message("⚠️  Mosaic failed for ", current_date, ", returning first raster instead.")
-        Rast <- template
-      }
-    }
-    
-    # --- Write mosaic or single raster ---
-    date_str <- strftime(current_date, "%Y%m%d")
-    outFile <- file.path(outDirMosaic, paste0(date_str, "_clipped_mosaic.tif"))
-    terra::writeRaster(Rast, outFile, overwrite = TRUE, filetype = "GTiff")
-    message("✅ Saved mosaic: ", outFile)
-    
-    return(outFile)
-    
-  }, error = function(e) {
-    # This prevents foreach from bombing out and lets you see *which* date failed
-    message("❌ ERROR on date ", dates_to_process[dd], " (index ", dd, "): ", conditionMessage(e))
-    NULL
-  })
-  
-  result
+# Sequential date loop (Mac-safe). Resume-friendly.
+#---------------------------------------------
+terraOptions(
+  tempdir = local_tmp,
+  memfrac = 0.5,
+  memmax  = 8,
+  threads = 1,          # do not nest threads
+  parallel = FALSE
+)
+
+has_overlap <- function(a, b) {
+  ea <- terra::ext(a); eb <- terra::ext(b)
+  !(ea$xmax <= eb$xmin || ea$xmin >= eb$xmax ||
+      ea$ymax <= eb$ymin || ea$ymin >= eb$ymax)
 }
+
+# Pair UDM2 to the same Planet scene, not just the same date
+udm2_scene_id <- function(path) {
+  b <- basename(path)
+  m <- regmatches(b, regexpr("\\d{8}_\\d{6}_\\d{2}_[0-9a-fA-F]+", b))
+  if (length(m) == 0) NA_character_ else m[1]
+}
+
+udm2_ids <- vapply(dfileUDM2, udm2_scene_id, character(1))
+
+n <- length(dates_to_process)
+message("🧭 ", length(existing_files), " mosaics on disk; ", n, " dates left.")
+
+for (dd in seq_along(dates_to_process)) {
+  current_date <- dates_to_process[dd]
+  if (!inherits(current_date, "Date")) {
+    current_date <- as.Date(current_date, origin = "1970-01-01")
+  }
+  date_yyyymmdd <- strftime(current_date, "%Y%m%d")
+  outFile <- file.path(outDirMosaic, paste0(date_yyyymmdd, "_clipped_mosaic.tif"))
+  
+  if (file.exists(outFile)) {
+    message("⏭️  [", dd, "/", n, "] already have ", basename(outFile))
+    next
+  }
+  
+  message("🔥 [", dd, "/", n, "] ", current_date)
+  files_today <- file_table[file_table$date == current_date, ]
+  imgB <- list()
+  
+  for (mm in seq_len(nrow(files_today))) {
+    base_file <- files_today$file_name[mm]
+    full_file <- files_today$full_path[mm]
+    message("  🧩 ", base_file)
+    
+    imgT <- try(terra::rast(full_file), silent = TRUE)
+    if (inherits(imgT, "try-error") || nlyr(imgT) < 4) next
+    
+    imgT <- try(terra::crop(imgT, siteWin), silent = TRUE)
+    if (inherits(imgT, "try-error")) next
+    
+    scene_id <- udm2_scene_id(base_file)
+    udm2_hit <- which(udm2_ids == scene_id)
+    if (length(udm2_hit) == 1) {
+      udm2T <- try(terra::rast(fileUDM2[udm2_hit[1]]), silent = TRUE)
+      if (!inherits(udm2T, "try-error") && has_overlap(udm2T, imgT)) {
+        if (!isTRUE(terra::compareGeom(imgT, udm2T, stopOnError = FALSE))) {
+          udm2T <- try(terra::crop(udm2T, imgT, snap = "out"), silent = TRUE)
+        }
+        if (!inherits(udm2T, "try-error")) {
+          # Planet UDM2 band 1: 1 = clear
+          mask_clear <- udm2T[[1]] == 1
+          imgT2 <- try(terra::mask(imgT, mask_clear, maskvalue = 0), silent = TRUE)
+          if (!inherits(imgT2, "try-error")) imgT <- imgT2
+        }
+      }
+    }
+    
+    imgB[[length(imgB) + 1]] <- imgT
+  }
+  
+  if (length(imgB) == 0) {
+    message("  ⛔ no usable rasters")
+    next
+  }
+  
+  if (length(imgB) == 1) {
+    Rast <- imgB[[1]]
+  } else {
+    template <- imgB[[1]]
+    aligned <- lapply(imgB, function(r) {
+      if (isTRUE(terra::compareGeom(r, template, stopOnError = FALSE))) r
+      else terra::resample(r, template, method = "near")
+    })
+    Rast <- try(do.call(terra::mosaic, aligned), silent = TRUE)
+    if (inherits(Rast, "try-error")) Rast <- template
+  }
+  
+  ok <- try(terra::writeRaster(Rast, outFile, overwrite = TRUE, filetype = "GTiff"),
+            silent = TRUE)
+  if (inherits(ok, "try-error")) {
+    message("  ❌ write failed: ", conditionMessage(attr(ok, "condition")))
+  } else {
+    message("  ✅ ", outFile)
+  }
+  
+  rm(imgB, Rast)
+  gc(verbose = FALSE)
+}
+
+message("✅ Mosaic process complete. Total mosaics: ",
+        length(list.files(outDirMosaic, pattern = "_clipped_mosaic\\.tif$")))
 
 #---------------------------------------------
 # Clean up cluster if used
