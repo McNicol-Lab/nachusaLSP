@@ -34,13 +34,13 @@ source("../pipeline/write_chunks_to_parquet_ds.R")
 load_wetlsp_packages()
 
 # define properties of extraction
-site_id <- "GF-Guy"
-old_site_id <- "NA-Par" 
-radius_m <- 3000
+site_id <- "Tellabs"
+old_site_id <- "Tellabs" 
+radius_m <- 500
 thin <- 1
 
 site_dir <- file.path("../output", site_id)
-geojson_path <- file.path("geojson/AMFLX", paste0(site_id, ".geojson"))
+geojson_path <- file.path("geojson", paste0(site_id, ".geojson"))
 out_subdir <- paste0("tables_sf_fetch_", radius_m, "m")
 
 sf_all_path <- file.path(site_dir, out_subdir, paste0(site_id, "-evi-timeseries-fetch-sf-", radius_m, "m.rds"))
@@ -53,7 +53,7 @@ site_dir <- paste0("../output/", site_id)  # adjust to your local path
 res <- extract_fetch_pixels(
   site_dir     = site_dir,
   site_id      = site_id,
-  geojson_path = paste0("../geojson/AMFLX/", old_site_id, ".geojson"),
+  geojson_path = paste0("../geojson/", old_site_id, ".geojson"),
   radius_m     = radius_m,
   out_subdir = out_subdir
 )
@@ -62,25 +62,25 @@ res <- extract_fetch_pixels(
 ## Combine extracted pixels into single sf object
 
 ```{r}
-# combine_fetch_sf_progress(
-#   fetch_dir = file.path(site_dir, out_subdir),
-#   site_dir  = site_dir,
-#   site_id   = site_id,
-#   radius_m = radius_m,
-#   progress_every = 10,
-# )
+combine_fetch_sf_progress(
+  fetch_dir = file.path(site_dir, out_subdir),
+  site_dir  = site_dir,
+  site_id   = site_id,
+  radius_m = radius_m,
+  progress_every = 10,
+)
 ```
 
 
 ```{r}
-combine_fetch_sf_progress_split4(
-  fetch_dir = file.path(site_dir, out_subdir),
-  site_dir  = site_dir,
-  site_id   = site_id,
-  radius_m  = radius_m,
-  n_parts   = 4,
-  progress_every = 10
-)
+# combine_fetch_sf_progress_split4(
+#   fetch_dir = file.path(site_dir, out_subdir),
+#   site_dir  = site_dir,
+#   site_id   = site_id,
+#   radius_m  = radius_m,
+#   n_parts   = 4,
+#   progress_every = 10
+# )
 ```
 
 ## Stitch into single .rds (will not work if RAM < 16 GB)

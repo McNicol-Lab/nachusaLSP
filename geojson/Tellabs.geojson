@@ -1,0 +1,39 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -89.3843,
+              41.889399999999995
+            ],
+            [
+              -89.3743,
+              41.889399999999995
+            ],
+            [
+              -89.3743,
+              41.8994
+            ],
+            [
+              -89.3843,
+              41.8994
+            ],
+            [
+              -89.3843,
+              41.889399999999995
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "name": "1km cutout at Nachusa-Grasslands-Tellabs",
+        "f": "Tellabs"
+      }
+    }
+  ]
+}

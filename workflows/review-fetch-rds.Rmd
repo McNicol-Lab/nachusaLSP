@@ -49,7 +49,7 @@ source("../pipeline/validation/wetlsp-helpers.R")
 NOTE: for multi-part RDS sites use this chunk first
 
 ```{r}
-site_name <- "GF-Guy"
+site_name <- "Tellabs"
 site_dir <- file.path("../output", site_name)
 
 part_paths <- list.files(
@@ -70,8 +70,8 @@ part_paths
 ## or for one rds
 
 ```{r}
-site_name <- "FR-LGt"
-radius_m <- 200
+site_name <- "Tellabs"
+radius_m <- 500
 site_dir <- file.path("../output", site_name)
 out_subdir <- paste0("tables_sf_fetch_", radius_m, "m")
 
@@ -124,7 +124,7 @@ mean(lengths(sf_all$evi_spline) > 0)
 
 ```{r}
 PickPixelInteractive(sf_all)
-ViewPixelTimeseries(sf_all, cell_vec = c(seq(676446, 676846, by = 5)))
+ViewPixelTimeseries(sf_all, cell_vec = c(seq(835262, 835282, by = 5)))
 ViewPixelViolin(sf_all, cell_vec = c(675123, 617804, 677831, 671202))
 ViewPixelBoxplot(sf_all, cell_vec = c(675123, 617804, 677831, 671202))
 
@@ -142,10 +142,10 @@ library(purrr)
 
 # selected pixels
 cell_vec <- c(
-  "1 - Road"  = 619033,
-  "2 - Clearing" = 965327,
-  "3 - More Trees" = 82571,
-  "4 - Trees"    = 565567
+  "1 - Tallgrass"  = 179497,
+  "2 - Wetland" = 239475,
+  "3 - Road" = 212543,
+  "4 - Trees"    = 192555
 )
 
 pix <- match(cell_vec, sf_all$cell)
@@ -193,13 +193,28 @@ ggplot(plot_df, aes(x = date, y = evi)) +
     y = "EVI"
   ) +
   theme_bw() +
-  scale_x_date(limits = c(as.Date(ymd("2021-01-01")), as.Date(ymd("2024-12-31")))) +
+  scale_x_date(limits = c(as.Date(ymd("2020-01-01")), as.Date(ymd("2025-12-31")))) +
   scale_y_continuous(limits = c(0, 1)) +
   theme(
     strip.background = element_rect(fill = "grey95"),
     panel.grid.minor = element_blank()
   )
 ```
+
+## quick look at geotiffs
+
+```{r}
+library(raster)
+```
+
+
+```{r}
+data <- raster("~/Documents/Research/Work/Nachusa Grasslands/PlanetScope/nachusaLSP/output/Nachusa/geotiffs/2025/24_2025_numObs.tif")
+
+plot(data)
+(41.8944, 89.3793)
+```
+
 
 
 

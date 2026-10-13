@@ -43,20 +43,23 @@ make_template_from_netcdf_or_sf <- function(nc_path = NULL, sf_ref, buffer_geom 
 # - radius_m: buffer radius in meters (e.g., 1000 for 1 km)
 make_site_buffer <- function(geojson_path, target_crs = NULL, radius_m = 1000) {
   aoi <- st_read(geojson_path, quiet = TRUE)
-  
+
   # If the GeoJSON is a polygon AOI, use its centroid as the "site point"
   # If it is already a point, centroid() will return the point itself.
   site_pt <- st_centroid(st_union(aoi))
-  
+
   if (!is.null(target_crs)) {
     site_pt <- st_transform(site_pt, target_crs)
   } else {
     # keep as-is for now; we'll transform later once we know chunk CRS
   }
-  
+
   # Buffer expects units consistent with CRS. In projected CRS (meters), radius_m is meters.
   st_buffer(site_pt, dist = radius_m)
 }
+
+
+
 
 # Filter one chunk sf object to only features intersecting the buffer
 filter_chunk_by_buffer <- function(chunk_sf, buffer_geom) {
